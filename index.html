@@ -590,6 +590,7 @@
     const [showSeedEditor,     setShowSeedEditor]     = useState(false);
     const [showSpeciesEditor,  setShowSpeciesEditor]  = useState(false);
     const [showAllBerries,     setShowAllBerries]     = useState(false);
+    const [featuredSort,       setFeaturedSort]       = useState("netProfit"); // default: net profit
 
     const metrics = useMemo(() =>
       speciesList.map(sp => ({ ...sp, ...calcMetrics(sp, seedPrices) })),
@@ -610,11 +611,22 @@
       topBase[d] = [...buckets[d]].sort((a,b) => b.baseNet48h - a.baseNet48h)[0] || null;
     });
 
-    // Featured rows: in FEATURED_ORDER, then remaining sorted by netPer48h
+    // Featured rows: in FEATURED_ORDER by default, sortable
     const featuredSet = new Set(FEATURED_ORDER);
-    const featuredRows = FEATURED_ORDER
+    const featuredUnsorted = FEATURED_ORDER
       .map(name => metrics.find(m => m.name === name))
       .filter(Boolean);
+    const featuredRows = useMemo(() => {
+      const rows = [...featuredUnsorted];
+      switch (featuredSort) {
+        case "name":       return rows.sort((a,b) => a.name.localeCompare(b.name));
+        case "effPrice":   return rows.sort((a,b) => b.effectivePrice - a.effectivePrice);
+        case "netProfit":  return rows.sort((a,b) => b.netProfit - a.netProfit);
+        case "margin":     return rows.sort((a,b) => b.margin - a.margin);
+        case "default":    return FEATURED_ORDER.map(name => rows.find(m => m.name === name)).filter(Boolean);
+        default:           return rows;
+      }
+    }, [metrics, featuredSort]);
     const remainingRows = sortedAll.filter(m => !featuredSet.has(m.name));
 
     const btnStyle = (active, ac, ab, abg) => ({
@@ -720,11 +732,28 @@
 
           {/* ── Featured berries table ── */}
           <div style={{ background:COL.card, border:`1px solid ${COL.border}`, borderRadius:"10px", padding:"16px", marginBottom:"4px" }}>
-            <div style={{ fontSize:"11px", color:COL.muted, letterSpacing:"2px", textTransform:"uppercase", marginBottom:"6px" }}>
-              Featured Berries — market price · sorted by listing order
-            </div>
-            <div style={{ fontSize:"11px", color:"#4a4a6a", marginBottom:"14px" }}>
-              Showing {featuredRows.length} featured · all prices reflect current market (default = base +$100, nets base after fee)
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px", flexWrap:"wrap", gap:"10px" }}>
+              <div>
+                <div style={{ fontSize:"11px", color:COL.muted, letterSpacing:"2px", textTransform:"uppercase", marginBottom:"4px" }}>
+                  Featured Berries — market price
+                </div>
+                <div style={{ fontSize:"11px", color:"#4a4a6a" }}>
+                  {featuredRows.length} featured · default = base +$100, nets base after fee
+                </div>
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                <label style={{ fontSize:"11px", color:COL.muted, whiteSpace:"nowrap" }}>Sort by:</label>
+                <select value={featuredSort} onChange={e => setFeaturedSort(e.target.value)}
+                  style={{ ...fs, width:"auto", padding:"4px 10px", fontSize:"12px",
+                    background:"#1a1a2e", border:`1px solid ${featuredSort !== "netProfit" ? COL.purple : COL.border}`,
+                    color: featuredSort !== "netProfit" ? COL.purple : COL.text, cursor:"pointer" }}>
+                  <option value="netProfit">Net Profit ↓</option>
+                  <option value="effPrice">Eff. Price ↓</option>
+                  <option value="margin">Margin ↓</option>
+                  <option value="name">Berry A→Z</option>
+                  <option value="default">Default Order</option>
+                </select>
+              </div>
             </div>
             <BerryTable rows={featuredRows} bestId={overallBest?.id} />
           </div>
